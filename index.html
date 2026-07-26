@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rajabify</title>
+
+<!-- Supabase client library (must load before our app.js) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Our styling, separated out -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Rajabify</h1>
+<p id="status">Not connected.</p>
+
+<section>
+  <h2>Sign up / Log in</h2>
+  <input id="email" type="email" placeholder="email">
+  <input id="password" type="password" placeholder="password">
+  <br>
+  <input id="gender" type="text" placeholder="gender">
+  <input id="nationality" type="text" placeholder="nationality">
+  <input id="dob" type="date">
+  <br>
+  <button id="signup-btn">Sign Up</button>
+  <button id="signin-btn">Log In</button>
+  <button id="signout-btn">Log Out</button>
+</section>
+
+<!-- Our app logic, loaded as a module so it can use import/export -->
+<script type="module" src="backend/app.js"></script>
+</body>
+</html>
