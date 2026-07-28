@@ -2,27 +2,164 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Create Playlist</title>
+<title>Create & Manage Playlists</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>Create Playlist</h1>
+<h1>Playlist Manager</h1>
 <p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
 
-<!--
-  TODO (Team assignment): implement playlist creation + add-song-to-playlist here.
-  Backend functions should live in backend/playlists.js, following the same
-  pattern as backend/albums.js and backend/songs.js:
-    - createPlaylist(name, isPublic)
-    - getMyPlaylists()
-    - addSongToPlaylist(userid, playlistid, songid)
-  RLS policies for playlists/playlist_songs are already implemented and tested.
--->
+<!-- Section 1: Create Playlist -->
 <section>
-  <p><em>Playlist creation UI — to be implemented.</em></p>
+  <h2>Create a New Playlist</h2>
+  <input id="playlist-name" type="text" placeholder="Playlist Name"><br><br>
+  <label>
+    <input id="playlist-public" type="checkbox" checked>
+    Public Playlist (Visible to everyone)
+  </label><br><br>
+  <button id="create-playlist-btn">Create Playlist</button>
 </section>
 
+<!-- Section 2: Manage Playlist Songs -->
+<section id="manage-section">
+  <h2>Add / Remove Songs</h2>
+  <label for="my-playlists">Select your playlist:</label>
+  <select id="my-playlists">
+    <option value="">-- Select a Playlist --</option>
+  </select>
+
+  <div id="playlist-contents-div" style="margin-top: 15px; display: none;">
+    <h3>Songs in Playlist</h3>
+    <ul id="playlist-songs-list"></ul>
+
+    <h3>Add Songs to Playlist</h3>
+    <ul id="available-songs-list"></ul>
+  </div>
+</section>
+
+<script type="module">
+  import { 
+    createPlaylist, 
+    getMyPlaylists, 
+    addSongToPlaylist, 
+    removeSongFromPlaylist, 
+    getPlaylistSongs 
+  } from './backend/playlists.js';
+  import { getAllSongs } from './backend/songs.js';
+
+  let currentPlaylists = [];
+  let allSongs = [];
+
+  // Load playlists and available songs on load
+  async function init() {
+    allSongs = await getAllSongs();
+    await refreshPlaylistsDropdown();
+  }
+
+  async function refreshPlaylistsDropdown() {
+    const select = document.getElementById('my-playlists');
+    select.innerHTML = '<option value="">-- Select a Playlist --</option>';
+    currentPlaylists = await getMyPlaylists();
+    
+    currentPlaylists.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.playlistid;
+      opt.textContent = `${p.playlist_name} (${p.is_public ? 'Public' : 'Private'})`;
+      select.appendChild(opt);
+    });
+  }
+
+  // Handle Playlist Creation
+  document.getElementById('create-playlist-btn').addEventListener('click', async () => {
+    const name = document.getElementById('playlist-name').value.trim();
+    const isPublic = document.getElementById('playlist-public').checked;
+
+    if (!name) {
+      alert('Please enter a playlist name.');
+      return;
+    }
+
+    const playlist = await createPlaylist(name, isPublic);
+    if (playlist) {
+      alert(`Playlist "${playlist.playlist_name}" created!`);
+      document.getElementById('playlist-name').value = '';
+      await refreshPlaylistsDropdown();
+    }
+  });
+
+  // When user picks a playlist from dropdown, show its songs & available songs
+  document.getElementById('my-playlists').addEventListener('change', async (e) => {
+    const playlistId = e.target.value;
+    const contentsDiv = document.getElementById('playlist-contents-div');
+
+    if (!playlistId) {
+      contentsDiv.style.display = 'none';
+      return;
+    }
+
+    contentsDiv.style.display = 'block';
+    await loadPlaylistDetails(playlistId);
+  });
+
+  async function loadPlaylistDetails(playlistId) {
+    // 1. Get songs currently in this playlist
+    const inPlaylist = await getPlaylistSongs(playlistId);
+    const inPlaylistIds = new Set(inPlaylist.map(s => s.songid));
+
+    // Render current songs
+    const playlistSongsList = document.getElementById('playlist-songs-list');
+    playlistSongsList.innerHTML = '';
+    
+    if (inPlaylist.length === 0) {
+      playlistSongsList.innerHTML = '<li><em>No songs in this playlist yet.</em></li>';
+    } else {
+      inPlaylist.forEach(song => {
+        const li = document.createElement('li');
+        li.textContent = `${song.song_title} (${song.duration}s) `;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'Remove';
+        removeBtn.style.marginLeft = '10px';
+        removeBtn.onclick = async () => {
+          const success = await removeSongFromPlaylist(playlistId, song.songid);
+          if (success) await loadPlaylistDetails(playlistId);
+        };
+
+        li.appendChild(removeBtn);
+        playlistSongsList.appendChild(li);
+      });
+    }
+
+    // 2. Render available songs (not yet in this playlist)
+    const availableSongsList = document.getElementById('available-songs-list');
+    availableSongsList.innerHTML = '';
+
+    const availableSongs = allSongs.filter(s => !inPlaylistIds.has(s.songid));
+
+    if (availableSongs.length === 0) {
+      availableSongsList.innerHTML = '<li><em>All available songs are already in this playlist.</em></li>';
+    } else {
+      availableSongs.forEach(song => {
+        const li = document.createElement('li');
+        li.textContent = `${song.song_title} (${song.duration}s) `;
+
+        const addBtn = document.createElement('button');
+        addBtn.textContent = 'Add to Playlist';
+        addBtn.style.marginLeft = '10px';
+        addBtn.onclick = async () => {
+          const success = await addSongToPlaylist(playlistId, song.songid);
+          if (success) await loadPlaylistDetails(playlistId);
+        };
+
+        li.appendChild(addBtn);
+        availableSongsList.appendChild(li);
+      });
+    }
+  }
+
+  init();
+</script>
 </body>
 </html>
