@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Publish a Song</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Publish a Song</h1>
+<p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
+
+<section>
+  <input id="song-title" type="text" placeholder="Song title"><br>
+  <input id="song-duration" type="number" placeholder="Duration (seconds)"><br>
+  <label for="song-album">Attach to album (optional):</label>
+  <select id="song-album">
+    <option value="">-- Single / no album --</option>
+  </select>
+  <br>
+  <button id="publish-song-btn">Publish Song</button>
+</section>
+
+<script type="module">
+  import { getMyAlbums } from './backend/albums.js';
+  import { publishSong } from './backend/songs.js';
+
+  // Populate the album dropdown with this artist's own albums.
+  async function loadAlbumOptions() {
+    const select = document.getElementById('song-album');
+    const albums = await getMyAlbums();
+    albums.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.albumid;
+      opt.textContent = a.album_title;
+      select.appendChild(opt);
+    });
+  }
+  loadAlbumOptions();
+
+  document.getElementById('publish-song-btn').addEventListener('click', async () => {
+    const title = document.getElementById('song-title').value;
+    const duration = parseInt(document.getElementById('song-duration').value, 10);
+    const albumId = document.getElementById('song-album').value; // "" = single
+    const song = await publishSong(title, duration, albumId);
+    if (song) {
+      alert(`Song "${song.song_title}" published.`);
+      window.location.href = 'dashboard.html';
+    }
+  });
+</script>
+</body>
+</html>

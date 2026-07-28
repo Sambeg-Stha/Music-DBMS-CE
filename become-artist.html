@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Become an Artist</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Become an Artist</h1>
+<p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
+
+<section>
+  <input id="artist-role" type="text" placeholder="e.g. Singer, Producer"><br>
+  <button id="become-artist-btn">Become an Artist</button>
+</section>
+
+<script type="module">
+  import { becomeArtist } from './backend/artists.js';
+
+  document.getElementById('become-artist-btn').addEventListener('click', async () => {
+    const role = document.getElementById('artist-role').value;
+    const success = await becomeArtist(role);
+    if (success) window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>

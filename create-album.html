@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Create Album</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Create Album</h1>
+<p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
+
+<section>
+  <input id="album-title" type="text" placeholder="Album title"><br>
+  <button id="create-album-btn">Create Album</button>
+</section>
+
+<section id="attach-section" style="display:none;">
+  <h2>Add your existing singles to this album (optional)</h2>
+  <p>These are songs you've already published that aren't part of an album yet.</p>
+  <ul id="unattached-list"></ul>
+  <button id="attach-selected-btn">Attach Selected Songs</button>
+  <p><a href="dashboard.html">Done — back to Dashboard</a></p>
+</section>
+
+<script type="module">
+  import { createAlbum, getMyUnattachedSongs, attachSongToAlbum } from './backend/albums.js';
+
+  let newAlbumId = null;
+
+  document.getElementById('create-album-btn').addEventListener('click', async () => {
+    const title = document.getElementById('album-title').value;
+    const album = await createAlbum(title);
+    if (!album) return;
+
+    newAlbumId = album.albumid;
+    alert(`Album "${album.album_title}" created.`);
+
+    // Show the list of the artist's own unattached singles so they
+    // can optionally group existing songs into this new album.
+    const singles = await getMyUnattachedSongs();
+    const list = document.getElementById('unattached-list');
+    list.innerHTML = '';
+    singles.forEach(s => {
+      const li = document.createElement('li');
+      li.innerHTML = `<label><input type="checkbox" value="${s.songid}"> ${s.song_title}</label>`;
+      list.appendChild(li);
+    });
+    document.getElementById('attach-section').style.display = singles.length ? 'block' : 'none';
+  });
+
+  document.getElementById('attach-selected-btn').addEventListener('click', async () => {
+    const checked = document.querySelectorAll('#unattached-list input[type=checkbox]:checked');
+    for (const checkbox of checked) {
+      await attachSongToAlbum(checkbox.value, newAlbumId);
+    }
+    alert('Selected songs attached to the album.');
+    window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>

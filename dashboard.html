@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Dashboard</h1>
+<p id="status">Checking session...</p>
+<p id="artist-status"></p>
+<button id="logout-btn">Log Out</button>
+
+<section>
+  <h2>Actions</h2>
+  <button onclick="location.href='become-artist.html'">Become an Artist</button>
+  <button onclick="location.href='create-album.html'">Create Album</button>
+  <button onclick="location.href='publish-song.html'">Publish Song</button>
+  <button onclick="location.href='create-playlist.html'">Create Playlist</button>
+</section>
+
+<section>
+  <h2>Available Songs</h2>
+  <ul id="song-list"></ul>
+</section>
+
+<section>
+  <h2>Available Albums</h2>
+  <ul id="album-list"></ul>
+</section>
+
+<section>
+  <h2>Public Playlists</h2>
+  <ul id="playlist-list"></ul>
+</section>
+
+<script type="module">
+  import { db } from './backend/supabaseClient.js';
+  import { signOut } from './backend/auth.js';
+  import { isCurrentUserArtist } from './backend/artists.js';
+  import { getAllSongs } from './backend/song.js';
+
+  // Guard: if not logged in, bounce back to login page.
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) {
+    window.location.href = 'login.html';
+  } else {
+    document.getElementById('status').textContent = `Logged in as ${user.email}`;
+    const isArtist = await isCurrentUserArtist();
+    document.getElementById('artist-status').textContent =
+      isArtist ? 'You are an artist.' : 'You are a regular listener.';
+  }
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await signOut();
+    window.location.href = 'login.html';
+  });
+
+  // Browse: songs
+  async function loadSongs() {
+    const songs = await getAllSongs();
+    const list = document.getElementById('song-list');
+    list.innerHTML = '';
+    songs.forEach(s => {
+      const li = document.createElement('li');
+      li.textContent = `${s.song_title} — ${s.duration}s${s.albumid ? '' : ' (single)'}`;
+      list.appendChild(li);
+    });
+  }
+
+  // Browse: albums
+  async function loadAlbums() {
+    const { data, error } = await db.from('albums').select('album_title');
+    const list = document.getElementById('album-list');
+    list.innerHTML = '';
+    if (error) { console.error(error); return; }
+    data.forEach(a => {
+      const li = document.createElement('li');
+      li.textContent = a.album_title;
+      list.appendChild(li);
+    });
+  }
+
+  // Browse: public playlists (playlist_songs/playlists RLS already
+  // filters this to public + own playlists automatically)
+  async function loadPlaylists() {
+    const { data, error } = await db.from('playlists').select('playlist_name, is_public');
+    const list = document.getElementById('playlist-list');
+    list.innerHTML = '';
+    if (error) { console.error(error); return; }
+    data.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = p.playlist_name + (p.is_public ? ' (public)' : ' (private)');
+      list.appendChild(li);
+    });
+  }
+
+  loadSongs();
+  loadAlbums();
+  loadPlaylists();
+</script>
+</body>
+</html>

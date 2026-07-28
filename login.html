@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Log In</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Log In</h1>
+
+<section>
+  <input id="email" type="email" placeholder="email"><br>
+  <input id="password" type="password" placeholder="password"><br>
+  <button id="login-btn">Log In</button>
+  <p><a href="signup.html">Don't have an account? Sign up</a></p>
+</section>
+
+<script type="module">
+  import { signIn } from './backend/auth.js';
+
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const success = await signIn(email, password);
+    if (success) window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>
