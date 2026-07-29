@@ -15,32 +15,37 @@
 
 <section>
   <h2>Actions</h2>
-  <button onclick="location.href='become-artist.html'">Become an Artist</button>
+  <button id="become-artist-nav-btn" onclick="location.href='become-artist.html'">Become an Artist</button>
   <button onclick="location.href='create-album.html'">Create Album</button>
   <button onclick="location.href='publish-song.html'">Publish Song</button>
   <button onclick="location.href='create-playlist.html'">Create Playlist</button>
 </section>
 
 <section>
-  <h2>Available Songs</h2>
+  <h2>Songs <small>(10 random)</small></h2>
   <ul id="song-list"></ul>
+  <a href="all-songs.html">All Songs &rarr;</a>
 </section>
 
 <section>
-  <h2>Available Albums</h2>
+  <h2>Albums <small>(10 random)</small></h2>
   <ul id="album-list"></ul>
+  <a href="all-albums.html">All Albums &rarr;</a>
 </section>
 
 <section>
-  <h2>Public Playlists</h2>
+  <h2>Playlists <small>(10 random)</small></h2>
   <ul id="playlist-list"></ul>
+  <a href="all-playlists.html">All Playlists &rarr;</a>
 </section>
 
 <script type="module">
   import { db } from './backend/supabaseClient.js';
   import { signOut } from './backend/auth.js';
   import { isCurrentUserArtist } from './backend/artists.js';
-  import { getAllSongs } from './backend/song.js';
+  import { getRandomSongs } from './backend/songs.js';
+  import { getRandomAlbums } from './backend/albums.js';
+  import { getRandomPlaylists } from './backend/playlists.js';
 
   // Guard: if not logged in, bounce back to login page.
   const { data: { user } } = await db.auth.getUser();
@@ -51,6 +56,11 @@
     const isArtist = await isCurrentUserArtist();
     document.getElementById('artist-status').textContent =
       isArtist ? 'You are an artist.' : 'You are a regular listener.';
+
+    // Only listeners should see the option to become an artist.
+    if (isArtist) {
+      document.getElementById('become-artist-nav-btn').style.display = 'none';
+    }
   }
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -58,41 +68,41 @@
     window.location.href = 'login.html';
   });
 
-  // Browse: songs
+  // Songs: displayed as "artist - song title"
   async function loadSongs() {
-    const songs = await getAllSongs();
+    const songs = await getRandomSongs(10);
     const list = document.getElementById('song-list');
     list.innerHTML = '';
     songs.forEach(s => {
+      const artistName = s.artists?.users?.username || 'Unknown Artist';
       const li = document.createElement('li');
-      li.textContent = `${s.song_title} — ${s.duration}s${s.albumid ? '' : ' (single)'}`;
+      li.textContent = `${artistName} - ${s.song_title}${s.albumid ? '' : ' (single)'}`;
       list.appendChild(li);
     });
   }
 
-  // Browse: albums
+  // Albums: displayed as "artist - album title"
   async function loadAlbums() {
-    const { data, error } = await db.from('albums').select('album_title');
+    const albums = await getRandomAlbums(10);
     const list = document.getElementById('album-list');
     list.innerHTML = '';
-    if (error) { console.error(error); return; }
-    data.forEach(a => {
+    albums.forEach(a => {
+      const artistName = a.artists?.users?.username || 'Unknown Artist';
       const li = document.createElement('li');
-      li.textContent = a.album_title;
+      li.textContent = `${artistName} - ${a.album_title}`;
       list.appendChild(li);
     });
   }
 
-  // Browse: public playlists (playlist_songs/playlists RLS already
-  // filters this to public + own playlists automatically)
+  // Playlists: displayed as "user - playlist name"
   async function loadPlaylists() {
-    const { data, error } = await db.from('playlists').select('playlist_name, is_public');
+    const playlists = await getRandomPlaylists(10);
     const list = document.getElementById('playlist-list');
     list.innerHTML = '';
-    if (error) { console.error(error); return; }
-    data.forEach(p => {
+    playlists.forEach(p => {
+      const ownerName = p.users?.username || 'Unknown User';
       const li = document.createElement('li');
-      li.textContent = p.playlist_name + (p.is_public ? ' (public)' : ' (private)');
+      li.textContent = `${ownerName} - ${p.playlist_name}${p.is_public ? '' : ' (private)'}`;
       list.appendChild(li);
     });
   }

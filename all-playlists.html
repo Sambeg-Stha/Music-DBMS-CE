@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>All Playlists</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>All Playlists</h1>
+<p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
+<p><em>Sorted by user. Shows your own playlists plus everyone's public playlists.</em></p>
+
+<ul id="playlist-list"></ul>
+
+<script type="module">
+  import { getAllPlaylistsSortedByOwner } from './backend/playlists.js';
+
+  async function loadAllPlaylists() {
+    const playlists = await getAllPlaylistsSortedByOwner();
+    const list = document.getElementById('playlist-list');
+    list.innerHTML = '';
+    playlists.forEach(p => {
+      const ownerName = p.users?.username || 'Unknown User';
+      const li = document.createElement('li');
+      li.textContent = `${ownerName} - ${p.playlist_name}${p.is_public ? '' : ' (private)'}`;
+      list.appendChild(li);
+    });
+  }
+
+  loadAllPlaylists();
+</script>
+</body>
+</html>

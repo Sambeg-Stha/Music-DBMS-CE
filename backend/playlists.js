@@ -13,6 +13,7 @@
 // -----------------------------------------------------------------
 
 import { db } from './supabaseClient.js';
+import { shuffleArray } from './utils.js';
 
 // 1. Create a new playlist
 export async function createPlaylist(name, isPublic) {
@@ -118,4 +119,40 @@ export async function getPlaylistSongs(playlistId) {
     return [];
   }
   return data.map(item => item.songs);
+}
+
+// 6. Returns 10 randomly selected playlists, joined with the owner's
+// username. Note: no filtering by userid is applied here on purpose --
+// RLS (playlists_select_own_or_public) already restricts results to
+// the caller's own playlists plus any public ones, so this naturally
+// shows a mix without extra logic.
+export async function getRandomPlaylists(limit = 10) {
+  const { data, error } = await db
+    .from('playlists')
+    .select('userid, playlistid, playlist_name, is_public, users(username)');
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return shuffleArray(data).slice(0, limit);
+}
+
+// 7. Returns ALL visible playlists (own + public, per RLS), joined
+// with owner username, sorted alphabetically by owner. Used on the
+// "All Playlists" page.
+export async function getAllPlaylistsSortedByOwner() {
+  const { data, error } = await db
+    .from('playlists')
+    .select('userid, playlistid, playlist_name, is_public, users(username)');
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data.sort((a, b) => {
+    const nameA = a.users?.username || '';
+    const nameB = b.users?.username || '';
+    return nameA.localeCompare(nameB);
+  });
 }

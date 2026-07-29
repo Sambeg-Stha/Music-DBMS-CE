@@ -17,7 +17,16 @@
 </section>
 
 <script type="module">
-  import { becomeArtist } from './backend/artists.js';
+  import { becomeArtist, isCurrentUserArtist } from './backend/artists.js';
+
+  // Guard: if the user is already an artist, this page doesn't apply
+  // to them -- send them back to the dashboard instead of letting
+  // them submit the form again.
+  const alreadyArtist = await isCurrentUserArtist();
+  if (alreadyArtist) {
+    alert('You are already an artist.');
+    window.location.href = 'dashboard.html';
+  }
 
   document.getElementById('become-artist-btn').addEventListener('click', async () => {
     const role = document.getElementById('artist-role').value;

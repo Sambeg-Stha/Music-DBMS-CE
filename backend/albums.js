@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------
 
 import { db } from './supabaseClient.js';
+import { shuffleArray } from './utils.js';
 
 export async function createAlbum(albumTitle) {
   const { data: { user } } = await db.auth.getUser();
@@ -77,4 +78,36 @@ export async function attachSongToAlbum(songId, albumId) {
     return false;
   }
   return true;
+}
+
+// Returns 10 randomly selected albums, each including the artist's
+// username. Used for the dashboard "showcase" view.
+export async function getRandomAlbums(limit = 10) {
+  const { data, error } = await db
+    .from('albums')
+    .select('albumid, album_title, artists(users(username))');
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return shuffleArray(data).slice(0, limit);
+}
+
+// Returns ALL albums, joined with artist username, sorted alphabetically
+// by artist name. Used on the "All Albums" page.
+export async function getAllAlbumsSortedByArtist() {
+  const { data, error } = await db
+    .from('albums')
+    .select('albumid, album_title, artists(users(username))');
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data.sort((a, b) => {
+    const nameA = a.artists?.users?.username || '';
+    const nameB = b.artists?.users?.username || '';
+    return nameA.localeCompare(nameB);
+  });
 }

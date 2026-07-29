@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>All Songs</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>All Songs</h1>
+<p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
+<p><em>Sorted by artist name</em></p>
+
+<ul id="song-list"></ul>
+
+<script type="module">
+  import { getAllSongsSortedByArtist } from './backend/songs.js';
+
+  async function loadAllSongs() {
+    const songs = await getAllSongsSortedByArtist();
+    const list = document.getElementById('song-list');
+    list.innerHTML = '';
+    songs.forEach(s => {
+      const artistName = s.artists?.users?.username || 'Unknown Artist';
+      const li = document.createElement('li');
+      li.textContent = `${artistName} - ${s.song_title}${s.albumid ? '' : ' (single)'}`;
+      list.appendChild(li);
+    });
+  }
+
+  loadAllSongs();
+</script>
+</body>
+</html>

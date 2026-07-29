@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------
 
 import { db } from './supabaseClient.js';
+import { shuffleArray } from './utils.js';
 
 // albumId can be null -> song is published as a single, matching
 // the "Contains" relationship being optional/partial on Song's side.
@@ -45,4 +46,38 @@ export async function getAllSongs() {
     return [];
   }
   return data;
+}
+
+// Returns 10 randomly selected songs, each including the artist's
+// username (joined via artists -> users). Used for the dashboard
+// "showcase" view, per the requirement that the dashboard only
+// previews a small random sample rather than the full catalog.
+export async function getRandomSongs(limit = 10) {
+  const { data, error } = await db
+    .from('songs')
+    .select('songid, song_title, duration, albumid, artists(users(username))');
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return shuffleArray(data).slice(0, limit);
+}
+
+// Returns ALL songs, joined with artist username, sorted alphabetically
+// by artist name. Used on the "All Songs" page.
+export async function getAllSongsSortedByArtist() {
+  const { data, error } = await db
+    .from('songs')
+    .select('songid, song_title, duration, albumid, artists(users(username))');
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data.sort((a, b) => {
+    const nameA = a.artists?.users?.username || '';
+    const nameB = b.artists?.users?.username || '';
+    return nameA.localeCompare(nameB);
+  });
 }
