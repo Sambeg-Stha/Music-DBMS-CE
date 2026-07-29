@@ -1,7 +1,15 @@
 // backend/playlists.js
 // -----------------------------------------------------------------
-// Handles: Creating playlists, managing songs in playlists, and 
+// Handles: Creating playlists, managing songs in playlists, and
 // retrieving user & public playlists.
+//
+// IMPORTANT: playlists and playlist_songs both use COMPOSITE primary
+// keys that include userid, e.g. playlist_songs PK = (userid,
+// playlistid, songid). This reflects Playlist being a weak entity in
+// the ER model (its playlistid is only unique per owning user).
+// Every insert/delete on playlist_songs MUST include userid, both to
+// satisfy the NOT NULL/foreign key constraints and because the RLS
+// policies check auth.uid() = userid directly.
 // -----------------------------------------------------------------
 
 import { db } from './supabaseClient.js';
@@ -49,13 +57,21 @@ export async function getMyPlaylists() {
 }
 
 // 3. Add a song to a playlist
+// NOTE: userid must be included -- it's part of the composite key
+// and is required by the playlist_songs_insert_own RLS policy
+// (auth.uid() = userid). Only a playlist's owner can add songs to it,
+// which matches the "only the owner manages their playlist" design.
 export async function addSongToPlaylist(playlistId, songId) {
   const { data: { user } } = await db.auth.getUser();
-  if (!user) return false;
+  if (!user) {
+    alert('You must be logged in.');
+    return false;
+  }
 
   const { error } = await db
     .from('playlist_songs')
     .insert({
+      userid: user.id,
       playlistid: playlistId,
       songid: songId
     });
@@ -69,9 +85,13 @@ export async function addSongToPlaylist(playlistId, songId) {
 
 // 4. Remove a song from a playlist
 export async function removeSongFromPlaylist(playlistId, songId) {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return false;
+
   const { error } = await db
     .from('playlist_songs')
     .delete()
+    .eq('userid', user.id)
     .eq('playlistid', playlistId)
     .eq('songid', songId);
 
@@ -83,6 +103,10 @@ export async function removeSongFromPlaylist(playlistId, songId) {
 }
 
 // 5. Get all songs inside a specific playlist (joins playlist_songs with songs)
+// Works for the playlist owner AND for browsing a public playlist --
+// RLS (playlist_songs_select_visible) already restricts this to
+// playlists that are the caller's own or marked public, so no extra
+// filtering is needed here.
 export async function getPlaylistSongs(playlistId) {
   const { data, error } = await db
     .from('playlist_songs')

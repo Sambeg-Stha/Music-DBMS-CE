@@ -40,14 +40,14 @@
 </section>
 
 <script type="module">
-  import { 
-    createPlaylist, 
-    getMyPlaylists, 
-    addSongToPlaylist, 
-    removeSongFromPlaylist, 
-    getPlaylistSongs 
+  import {
+    createPlaylist,
+    getMyPlaylists,
+    addSongToPlaylist,
+    removeSongFromPlaylist,
+    getPlaylistSongs
   } from './backend/playlists.js';
-  import { getAllSongs } from './backend/songs.js';
+  import { getAllSongs } from './backend/song.js';
 
   let currentPlaylists = [];
   let allSongs = [];
@@ -62,7 +62,7 @@
     const select = document.getElementById('my-playlists');
     select.innerHTML = '<option value="">-- Select a Playlist --</option>';
     currentPlaylists = await getMyPlaylists();
-    
+
     currentPlaylists.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.playlistid;
@@ -111,14 +111,14 @@
     // Render current songs
     const playlistSongsList = document.getElementById('playlist-songs-list');
     playlistSongsList.innerHTML = '';
-    
+
     if (inPlaylist.length === 0) {
       playlistSongsList.innerHTML = '<li><em>No songs in this playlist yet.</em></li>';
     } else {
       inPlaylist.forEach(song => {
         const li = document.createElement('li');
         li.textContent = `${song.song_title} (${song.duration}s) `;
-        
+
         const removeBtn = document.createElement('button');
         removeBtn.textContent = 'Remove';
         removeBtn.style.marginLeft = '10px';
