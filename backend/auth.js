@@ -7,21 +7,27 @@
 
 import { db } from './supabaseClient.js';
 
-export async function signUp(email, password, gender, nationality, dateOfBirth) {
+export async function signUp(username, email, password, gender, nationality, dateOfBirth) {
   const { error } = await db.auth.signUp({
     email,
     password,
     options: {
-      data: { gender, nationality, date_of_birth: dateOfBirth }
+      data: { username, gender, nationality, date_of_birth: dateOfBirth }
     }
   });
   if (error) {
-    alert(error.message);
+    // Supabase surfaces raw DB errors (e.g. "duplicate key value violates
+    // unique constraint") -- translate the common ones into plain English.
+    if (error.message.includes('duplicate key') || error.message.includes('already registered')) {
+      alert('That email or username is already taken. Please choose another.');
+    } else {
+      alert(error.message);
+    }
     return false;
   }
-  // The public.users row (including these extra fields) is created
-  // automatically by the handle_new_user trigger, which reads them
-  // back out of this metadata.
+  // The public.users row (including username and these extra fields)
+  // is created automatically by the handle_new_user trigger, which
+  // reads them back out of this metadata.
   alert('Signed up! If email confirmation is required, check your inbox.');
   return true;
 }

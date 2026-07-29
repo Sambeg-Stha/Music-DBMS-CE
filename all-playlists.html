@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>All Playlists</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
@@ -15,16 +16,27 @@
 <ul id="playlist-list"></ul>
 
 <script type="module">
+  import { db } from './backend/supabaseClient.js';
   import { getAllPlaylistsSortedByOwner } from './backend/playlists.js';
+
+  // ── Auth guard ─────────────────────────────────────────────────
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { window.location.href = 'login.html'; }
 
   async function loadAllPlaylists() {
     const playlists = await getAllPlaylistsSortedByOwner();
-    const list = document.getElementById('playlist-list');
-    list.innerHTML = '';
+    const list      = document.getElementById('playlist-list');
+    list.innerHTML  = '';
+
+    if (playlists.length === 0) {
+      list.innerHTML = '<li><em>No playlists yet.</em></li>';
+      return;
+    }
+
     playlists.forEach(p => {
       const ownerName = p.users?.username || 'Unknown User';
-      const li = document.createElement('li');
-      li.textContent = `${ownerName} - ${p.playlist_name}${p.is_public ? '' : ' (private)'}`;
+      const li        = document.createElement('li');
+      li.textContent  = `${ownerName} — ${p.playlist_name}${!p.is_public ? ' (private)' : ''}`;
       list.appendChild(li);
     });
   }

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>All Songs</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
@@ -15,16 +16,28 @@
 <ul id="song-list"></ul>
 
 <script type="module">
+  import { db } from './backend/supabaseClient.js';
   import { getAllSongsSortedByArtist } from './backend/songs.js';
+
+  // ── Auth guard ─────────────────────────────────────────────────
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { window.location.href = 'login.html'; }
 
   async function loadAllSongs() {
     const songs = await getAllSongsSortedByArtist();
-    const list = document.getElementById('song-list');
+    const list  = document.getElementById('song-list');
     list.innerHTML = '';
+
+    if (songs.length === 0) {
+      list.innerHTML = '<li><em>No songs yet.</em></li>';
+      return;
+    }
+
     songs.forEach(s => {
       const artistName = s.artists?.users?.username || 'Unknown Artist';
-      const li = document.createElement('li');
-      li.textContent = `${artistName} - ${s.song_title}${s.albumid ? '' : ' (single)'}`;
+      const genre      = s.song_genres?.[0]?.genre_name || '';
+      const li         = document.createElement('li');
+      li.textContent   = `${artistName} — ${s.song_title}${genre ? ' · ' + genre : ''}${!s.albumid ? ' (single)' : ''}`;
       list.appendChild(li);
     });
   }

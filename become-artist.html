@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Become an Artist</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
@@ -12,16 +13,22 @@
 <p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
 
 <section>
-  <input id="artist-role" type="text" placeholder="e.g. Singer, Producer"><br>
+  <label for="artist-role">Your Role (e.g. Singer, Producer)</label><br>
+  <input id="artist-role" type="text" placeholder="e.g. Singer, Producer"><br><br>
   <button id="become-artist-btn">Become an Artist</button>
 </section>
 
 <script type="module">
+  import { db }              from './backend/supabaseClient.js';
   import { becomeArtist, isCurrentUserArtist } from './backend/artists.js';
 
-  // Guard: if the user is already an artist, this page doesn't apply
-  // to them -- send them back to the dashboard instead of letting
-  // them submit the form again.
+  // ── Auth guard: redirect to login if not logged in ────────────
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { window.location.href = 'login.html'; }
+
+  // ── Guard: if the user is already an artist, this page doesn't
+  // apply to them -- send them back to the dashboard instead of
+  // letting them submit the form again.
   const alreadyArtist = await isCurrentUserArtist();
   if (alreadyArtist) {
     alert('You are already an artist.');
@@ -29,7 +36,8 @@
   }
 
   document.getElementById('become-artist-btn').addEventListener('click', async () => {
-    const role = document.getElementById('artist-role').value;
+    const role    = document.getElementById('artist-role').value.trim();
+    if (!role) { alert('Please enter your artist role.'); return; }
     const success = await becomeArtist(role);
     if (success) window.location.href = 'dashboard.html';
   });

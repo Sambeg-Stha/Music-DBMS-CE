@@ -1,6 +1,7 @@
 // backend/playlists.js
 // -----------------------------------------------------------------
-// Handles: Creating playlists, managing songs in playlists, and
+// Handles: Creating playlists, managing songs in playlists,
+// updating playlist metadata (name, visibility), and
 // retrieving user & public playlists.
 //
 // IMPORTANT: playlists and playlist_songs both use COMPOSITE primary
@@ -27,8 +28,8 @@ export async function createPlaylist(name, isPublic) {
     .from('playlists')
     .insert({
       playlist_name: name,
-      is_public: isPublic,
-      userid: user.id
+      is_public:     isPublic,
+      userid:        user.id
     })
     .select()
     .single();
@@ -72,9 +73,9 @@ export async function addSongToPlaylist(playlistId, songId) {
   const { error } = await db
     .from('playlist_songs')
     .insert({
-      userid: user.id,
+      userid:     user.id,
       playlistid: playlistId,
-      songid: songId
+      songid:     songId
     });
 
   if (error) {
@@ -121,7 +122,55 @@ export async function getPlaylistSongs(playlistId) {
   return data.map(item => item.songs);
 }
 
-// 6. Returns 10 randomly selected playlists, joined with the owner's
+// 6. Updates a playlist's name and/or visibility.
+// RLS policy "playlists_update_own" ensures only the owner can do this.
+// userid is included in the WHERE clause as an extra safety check.
+export async function updatePlaylist(playlistId, name, isPublic) {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await db
+    .from('playlists')
+    .update({ playlist_name: name, is_public: isPublic })
+    .eq('playlistid', playlistId)
+    .eq('userid', user.id);   // belt-and-suspenders: RLS already enforces this
+
+  if (error) {
+    alert('Could not update playlist: ' + error.message);
+    return false;
+  }
+  return true;
+}
+
+// 7. Deletes a playlist owned by the current user.
+// Removes all playlist_songs entries first (in case there's no ON DELETE CASCADE
+// on the FK), then deletes the playlist row itself.
+// RLS policy "playlists_delete_own" must exist on the playlists table.
+export async function deletePlaylist(playlistId) {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return false;
+
+  // Remove all songs from the playlist first
+  await db
+    .from('playlist_songs')
+    .delete()
+    .eq('playlistid', playlistId)
+    .eq('userid', user.id);
+
+  const { error } = await db
+    .from('playlists')
+    .delete()
+    .eq('playlistid', playlistId)
+    .eq('userid', user.id);
+
+  if (error) {
+    alert('Could not delete playlist: ' + error.message);
+    return false;
+  }
+  return true;
+}
+
+// 7. Returns 10 randomly selected playlists, joined with the owner's
 // username. Note: no filtering by userid is applied here on purpose --
 // RLS (playlists_select_own_or_public) already restricts results to
 // the caller's own playlists plus any public ones, so this naturally
@@ -138,7 +187,7 @@ export async function getRandomPlaylists(limit = 10) {
   return shuffleArray(data).slice(0, limit);
 }
 
-// 7. Returns ALL visible playlists (own + public, per RLS), joined
+// 8. Returns ALL visible playlists (own + public, per RLS), joined
 // with owner username, sorted alphabetically by owner. Used on the
 // "All Playlists" page.
 export async function getAllPlaylistsSortedByOwner() {

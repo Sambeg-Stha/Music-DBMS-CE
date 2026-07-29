@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>All Albums</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
@@ -15,16 +16,27 @@
 <ul id="album-list"></ul>
 
 <script type="module">
+  import { db } from './backend/supabaseClient.js';
   import { getAllAlbumsSortedByArtist } from './backend/albums.js';
+
+  // ── Auth guard ─────────────────────────────────────────────────
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { window.location.href = 'login.html'; }
 
   async function loadAllAlbums() {
     const albums = await getAllAlbumsSortedByArtist();
-    const list = document.getElementById('album-list');
+    const list   = document.getElementById('album-list');
     list.innerHTML = '';
+
+    if (albums.length === 0) {
+      list.innerHTML = '<li><em>No albums yet.</em></li>';
+      return;
+    }
+
     albums.forEach(a => {
       const artistName = a.artists?.users?.username || 'Unknown Artist';
-      const li = document.createElement('li');
-      li.textContent = `${artistName} - ${a.album_title}`;
+      const li         = document.createElement('li');
+      li.textContent   = `${artistName} — ${a.album_title}`;
       list.appendChild(li);
     });
   }

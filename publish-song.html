@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Publish a Song</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
@@ -11,44 +12,210 @@
 <h1>Publish a Song</h1>
 <p><a href="dashboard.html">&larr; Back to Dashboard</a></p>
 
+<!-- ── Section 1: Publish a new song ────────────────────────── -->
 <section>
+  <h2>New Song</h2>
+  <label for="song-title">Song Title</label><br>
   <input id="song-title" type="text" placeholder="Song title"><br>
-  <input id="song-duration" type="number" placeholder="Duration (seconds)"><br>
-  <label for="song-album">Attach to album (optional):</label>
+
+  <label for="song-duration">Duration (seconds)</label><br>
+  <input id="song-duration" type="number" placeholder="e.g. 213"><br>
+
+  <label for="song-genre">Genre</label><br>
+  <select id="song-genre">
+    <option value="">-- Select a Genre --</option>
+    <option>Pop</option>
+    <option>Rock</option>
+    <option>Hip-Hop</option>
+    <option>Jazz</option>
+    <option>Classical</option>
+    <option>Electronic</option>
+    <option>R&amp;B</option>
+    <option>Country</option>
+    <option>Other</option>
+  </select><br>
+
+  <label for="song-album">Attach to album (optional):</label><br>
   <select id="song-album">
     <option value="">-- Single / no album --</option>
-  </select>
-  <br>
+  </select><br><br>
+
   <button id="publish-song-btn">Publish Song</button>
 </section>
 
-<script type="module">
-  import { getMyAlbums } from './backend/albums.js';
-  import { publishSong } from './backend/songs.js';
+<!-- ── Section 2: My Published Songs (edit existing) ─────────── -->
+<section>
+  <h2>My Published Songs</h2>
+  <ul id="my-songs-list"><li>Loading...</li></ul>
+</section>
 
-  // Populate the album dropdown with this artist's own albums.
+<!-- ── Section 3: Inline edit form (hidden until Edit clicked) ── -->
+<section id="edit-song-section" style="display:none;">
+  <h2>Edit Song</h2>
+
+  <label for="edit-song-title">Song Title</label><br>
+  <input id="edit-song-title" type="text"><br>
+
+  <label for="edit-song-duration">Duration (seconds)</label><br>
+  <input id="edit-song-duration" type="number"><br>
+
+  <label for="edit-song-genre">Genre</label><br>
+  <select id="edit-song-genre">
+    <option value="">-- No Genre --</option>
+    <option>Pop</option>
+    <option>Rock</option>
+    <option>Hip-Hop</option>
+    <option>Jazz</option>
+    <option>Classical</option>
+    <option>Electronic</option>
+    <option>R&amp;B</option>
+    <option>Country</option>
+    <option>Other</option>
+  </select><br>
+
+  <label for="edit-song-album">Album</label><br>
+  <select id="edit-song-album">
+    <option value="">-- Single / no album --</option>
+  </select><br><br>
+
+  <button id="save-song-btn">Save Changes</button>
+  <button id="cancel-edit-btn">Cancel</button>
+</section>
+
+<script type="module">
+  import { db }                from './backend/supabaseClient.js';
+  import { isCurrentUserArtist } from './backend/artists.js';
+  import { getMyAlbums }       from './backend/albums.js';
+  import { publishSong, getMySongs, updateSong, deleteSong } from './backend/songs.js';
+
+  // ── Auth + artist guard ────────────────────────────────────────
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { window.location.href = 'login.html'; }
+
+  const isArtist = await isCurrentUserArtist();
+  if (!isArtist) {
+    alert('You must be an artist to publish songs. Become an artist first.');
+    window.location.href = 'dashboard.html';
+  }
+
+  // ── State ──────────────────────────────────────────────────────
+  let currentEditSongId = null;
+
+  // ── Load album options into both dropdowns ─────────────────────
   async function loadAlbumOptions() {
-    const select = document.getElementById('song-album');
     const albums = await getMyAlbums();
-    albums.forEach(a => {
-      const opt = document.createElement('option');
-      opt.value = a.albumid;
-      opt.textContent = a.album_title;
-      select.appendChild(opt);
+
+    [document.getElementById('song-album'),
+     document.getElementById('edit-song-album')].forEach(select => {
+      albums.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value       = a.albumid;
+        opt.textContent = a.album_title;
+        select.appendChild(opt);
+      });
     });
   }
-  loadAlbumOptions();
 
-  document.getElementById('publish-song-btn').addEventListener('click', async () => {
-    const title = document.getElementById('song-title').value;
-    const duration = parseInt(document.getElementById('song-duration').value, 10);
-    const albumId = document.getElementById('song-album').value; // "" = single
-    const song = await publishSong(title, duration, albumId);
-    if (song) {
-      alert(`Song "${song.song_title}" published.`);
-      window.location.href = 'dashboard.html';
+  // ── Render artist's own songs ──────────────────────────────────
+  async function loadMySongs() {
+    const songs = await getMySongs();
+    const list  = document.getElementById('my-songs-list');
+    list.innerHTML = '';
+
+    if (songs.length === 0) {
+      list.innerHTML = '<li><em>You have no published songs yet.</em></li>';
+      return;
+    }
+
+    songs.forEach(s => {
+      const genre = s.song_genres?.[0]?.genre_name || 'No genre';
+      const li    = document.createElement('li');
+      li.textContent = `${s.song_title} (${s.duration}s) — ${genre}${s.albumid ? '' : ' · single'}  `;
+
+      const editBtn       = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.onclick     = () => openEditForm(s);
+      li.appendChild(editBtn);
+
+      const delBtn        = document.createElement('button');
+      delBtn.textContent  = 'Delete';
+      delBtn.style.marginLeft = '6px';
+      delBtn.onclick = async () => {
+        if (!confirm(`Delete "${s.song_title}"? This cannot be undone.`)) return;
+        const ok = await deleteSong(s.songid);
+        if (ok) await loadMySongs();
+      };
+      li.appendChild(delBtn);
+
+      list.appendChild(li);
+    });
+  }
+
+  // ── Open inline edit form pre-filled with song data ───────────
+  function openEditForm(song) {
+    currentEditSongId = song.songid;
+
+    document.getElementById('edit-song-title').value    = song.song_title;
+    document.getElementById('edit-song-duration').value = song.duration;
+    document.getElementById('edit-song-genre').value    = song.song_genres?.[0]?.genre_name || '';
+    document.getElementById('edit-song-album').value    = song.albumid || '';
+
+    const editSection = document.getElementById('edit-song-section');
+    editSection.style.display = 'block';
+    editSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ── Save edited song ───────────────────────────────────────────
+  document.getElementById('save-song-btn').addEventListener('click', async () => {
+    if (!currentEditSongId) return;
+
+    const songTitle = document.getElementById('edit-song-title').value.trim();
+    const duration  = parseInt(document.getElementById('edit-song-duration').value, 10);
+    const genre     = document.getElementById('edit-song-genre').value;
+    const albumId   = document.getElementById('edit-song-album').value;
+
+    if (!songTitle)              { alert('Song title cannot be empty.');      return; }
+    if (!duration || duration <= 0) { alert('Please enter a valid duration.'); return; }
+
+    const success = await updateSong(currentEditSongId, { songTitle, duration, albumId, genre });
+    if (success) {
+      alert('Song updated successfully!');
+      document.getElementById('edit-song-section').style.display = 'none';
+      currentEditSongId = null;
+      await loadMySongs();
     }
   });
+
+  // ── Cancel edit ────────────────────────────────────────────────
+  document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+    document.getElementById('edit-song-section').style.display = 'none';
+    currentEditSongId = null;
+  });
+
+  // ── Publish a new song ─────────────────────────────────────────
+  document.getElementById('publish-song-btn').addEventListener('click', async () => {
+    const title    = document.getElementById('song-title').value.trim();
+    const duration = parseInt(document.getElementById('song-duration').value, 10);
+    const albumId  = document.getElementById('song-album').value;
+    const genre    = document.getElementById('song-genre').value;
+
+    if (!title)                  { alert('Please enter a song title.');                               return; }
+    if (!duration || duration <= 0) { alert('Please enter a valid duration in seconds (> 0).'); return; }
+
+    const song = await publishSong(title, duration, albumId, genre);
+    if (song) {
+      alert(`Song "${song.song_title}" published!`);
+      document.getElementById('song-title').value    = '';
+      document.getElementById('song-duration').value = '';
+      document.getElementById('song-genre').value    = '';
+      document.getElementById('song-album').value    = '';
+      await loadMySongs();
+    }
+  });
+
+  // ── Init ───────────────────────────────────────────────────────
+  await loadAlbumOptions();
+  await loadMySongs();
 </script>
 </body>
 </html>

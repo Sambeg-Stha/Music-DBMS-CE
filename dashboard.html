@@ -1,10 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
+<style>
+  /* ── Modal overlay ─────────────────────────────────────────── */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+  }
+  #modal-box {
+    background: #fff;
+    max-width: 480px;
+    margin: 80px auto;
+    padding: 28px 24px;
+    border-radius: 10px;
+    max-height: 70vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  }
+  #modal-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  /* ── Clickable list items ───────────────────────────────────── */
+  .clickable-item {
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  .clickable-item:hover {
+    text-decoration: underline;
+  }
+</style>
 </head>
 <body>
 
@@ -16,38 +55,46 @@
 <section>
   <h2>Actions</h2>
   <button id="become-artist-nav-btn" onclick="location.href='become-artist.html'">Become an Artist</button>
-  <button onclick="location.href='create-album.html'">Create Album</button>
-  <button onclick="location.href='publish-song.html'">Publish Song</button>
-  <button onclick="location.href='create-playlist.html'">Create Playlist</button>
+  <button onclick="location.href='create-album.html'">Create / Edit Album</button>
+  <button onclick="location.href='publish-song.html'">Publish / Edit Song</button>
+  <button onclick="location.href='create-playlist.html'">Create / Edit Playlist</button>
 </section>
 
 <section>
-  <h2>Songs <small>(10 random)</small></h2>
+  <h2>Songs <small>(10 random — click to preview)</small></h2>
   <ul id="song-list"></ul>
   <a href="all-songs.html">All Songs &rarr;</a>
 </section>
 
 <section>
-  <h2>Albums <small>(10 random)</small></h2>
+  <h2>Albums <small>(10 random — click for details)</small></h2>
   <ul id="album-list"></ul>
   <a href="all-albums.html">All Albums &rarr;</a>
 </section>
 
 <section>
-  <h2>Playlists <small>(10 random)</small></h2>
+  <h2>Playlists <small>(10 random — click for details)</small></h2>
   <ul id="playlist-list"></ul>
   <a href="all-playlists.html">All Playlists &rarr;</a>
 </section>
 
-<script type="module">
-  import { db } from './backend/supabaseClient.js';
-  import { signOut } from './backend/auth.js';
-  import { isCurrentUserArtist } from './backend/artists.js';
-  import { getRandomSongs } from './backend/songs.js';
-  import { getRandomAlbums } from './backend/albums.js';
-  import { getRandomPlaylists } from './backend/playlists.js';
+<!-- ── Shared modal ────────────────────────────────────────────── -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <button id="modal-close" aria-label="Close">&#x2715;</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
 
-  // Guard: if not logged in, bounce back to login page.
+<script type="module">
+  import { db }              from './backend/supabaseClient.js';
+  import { signOut }         from './backend/auth.js';
+  import { isCurrentUserArtist } from './backend/artists.js';
+  import { getRandomSongs }  from './backend/songs.js';
+  import { getRandomAlbums, getAlbumSongs } from './backend/albums.js';
+  import { getRandomPlaylists, getPlaylistSongs } from './backend/playlists.js';
+
+  // ── Auth guard ─────────────────────────────────────────────────
   const { data: { user } } = await db.auth.getUser();
   if (!user) {
     window.location.href = 'login.html';
@@ -57,52 +104,178 @@
     document.getElementById('artist-status').textContent =
       isArtist ? 'You are an artist.' : 'You are a regular listener.';
 
-    // Only listeners should see the option to become an artist.
+    // Only listeners should see the "Become an Artist" button
     if (isArtist) {
       document.getElementById('become-artist-nav-btn').style.display = 'none';
     }
   }
 
+  // ── Logout ─────────────────────────────────────────────────────
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await signOut();
     window.location.href = 'login.html';
   });
 
-  // Songs: displayed as "artist - song title"
+  // ── Modal helpers ──────────────────────────────────────────────
+  const overlay = document.getElementById('modal-overlay');
+  const content = document.getElementById('modal-content');
+
+  function openModal(html) {
+    content.innerHTML = html;
+    overlay.style.display = 'block';
+  }
+
+  function closeModal() {
+    overlay.style.display = 'none';
+    content.innerHTML = '';
+  }
+
+  // Close on ✕ button or clicking outside the box
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+  // ── Duration formatter: 213s → "3:33" ─────────────────────────
+  function fmtDuration(secs) {
+    const m = Math.floor(secs / 60);
+    const s = String(secs % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  // ── Song modal: "Now Playing" popup ───────────────────────────
+  function showSongModal(song) {
+    const artistName = song.artists?.users?.username || 'Unknown Artist';
+    const genre      = song.song_genres?.[0]?.genre_name || '—';
+    const duration   = fmtDuration(song.duration);
+
+    openModal(`
+      <h2>&#127925; Now Playing</h2>
+      <h3 style="margin:8px 0;">"${song.song_title}"</h3>
+      <p><strong>Artist:</strong> ${artistName}</p>
+      <p><strong>Genre:</strong> ${genre}</p>
+      <p><strong>Duration:</strong> ${duration}</p>
+      ${!song.albumid ? '<p><em>Single release</em></p>' : ''}
+    `);
+  }
+
+  // ── Album modal: album name + song list ────────────────────────
+  async function showAlbumModal(album) {
+    const artistName = album.artists?.users?.username || 'Unknown Artist';
+
+    // Show loading state immediately
+    openModal(`
+      <h2>&#128191; ${album.album_title}</h2>
+      <p><strong>Artist:</strong> ${artistName}</p>
+      <p><em>Loading songs…</em></p>
+    `);
+
+    const songs = await getAlbumSongs(album.albumid);
+    const songsHtml = songs.length
+      ? '<ul>' + songs.map(s => {
+          const genre = s.song_genres?.[0]?.genre_name || '';
+          return `<li>${s.song_title} — ${fmtDuration(s.duration)}${genre ? ' · ' + genre : ''}</li>`;
+        }).join('') + '</ul>'
+      : '<p><em>No songs in this album yet.</em></p>';
+
+    openModal(`
+      <h2>&#128191; ${album.album_title}</h2>
+      <p><strong>Artist:</strong> ${artistName}</p>
+      <h3>Songs (${songs.length})</h3>
+      ${songsHtml}
+    `);
+  }
+
+  // ── Playlist modal: playlist name + song list ─────────────────
+  async function showPlaylistModal(playlist) {
+    const ownerName = playlist.users?.username || 'Unknown User';
+    const visibility = playlist.is_public ? 'Public' : 'Private';
+
+    // Show loading state immediately
+    openModal(`
+      <h2>&#128203; ${playlist.playlist_name}</h2>
+      <p><strong>By:</strong> ${ownerName} &nbsp;|&nbsp; ${visibility}</p>
+      <p><em>Loading songs…</em></p>
+    `);
+
+    const songs = await getPlaylistSongs(playlist.playlistid);
+    const songsHtml = songs.length
+      ? '<ul>' + songs.map(s =>
+          `<li>${s.song_title} — ${fmtDuration(s.duration)}</li>`
+        ).join('') + '</ul>'
+      : '<p><em>No songs in this playlist yet.</em></p>';
+
+    openModal(`
+      <h2>&#128203; ${playlist.playlist_name}</h2>
+      <p><strong>By:</strong> ${ownerName} &nbsp;|&nbsp; ${visibility}</p>
+      <h3>Songs (${songs.length})</h3>
+      ${songsHtml}
+    `);
+  }
+
+  // ── Load songs (clickable) ─────────────────────────────────────
   async function loadSongs() {
     const songs = await getRandomSongs(10);
-    const list = document.getElementById('song-list');
+    const list  = document.getElementById('song-list');
     list.innerHTML = '';
+
+    if (songs.length === 0) {
+      list.innerHTML = '<li><em>No songs yet.</em></li>';
+      return;
+    }
+
     songs.forEach(s => {
       const artistName = s.artists?.users?.username || 'Unknown Artist';
-      const li = document.createElement('li');
-      li.textContent = `${artistName} - ${s.song_title}${s.albumid ? '' : ' (single)'}`;
+      const li         = document.createElement('li');
+      li.className     = 'clickable-item';
+      li.textContent   = `${artistName} — ${s.song_title}${!s.albumid ? ' (single)' : ''}`;
+      li.addEventListener('click', () => showSongModal(s));
       list.appendChild(li);
     });
   }
 
-  // Albums: displayed as "artist - album title"
+  // ── Load albums (clickable) ────────────────────────────────────
   async function loadAlbums() {
     const albums = await getRandomAlbums(10);
-    const list = document.getElementById('album-list');
+    const list   = document.getElementById('album-list');
     list.innerHTML = '';
+
+    if (albums.length === 0) {
+      list.innerHTML = '<li><em>No albums yet.</em></li>';
+      return;
+    }
+
     albums.forEach(a => {
       const artistName = a.artists?.users?.username || 'Unknown Artist';
-      const li = document.createElement('li');
-      li.textContent = `${artistName} - ${a.album_title}`;
+      const li         = document.createElement('li');
+      li.className     = 'clickable-item';
+      li.textContent   = `${artistName} — ${a.album_title}`;
+      li.addEventListener('click', () => showAlbumModal(a));
       list.appendChild(li);
     });
   }
 
-  // Playlists: displayed as "user - playlist name"
+  // ── Load playlists (clickable) ─────────────────────────────────
   async function loadPlaylists() {
     const playlists = await getRandomPlaylists(10);
-    const list = document.getElementById('playlist-list');
-    list.innerHTML = '';
+    const list      = document.getElementById('playlist-list');
+    list.innerHTML  = '';
+
+    if (playlists.length === 0) {
+      list.innerHTML = '<li><em>No playlists yet.</em></li>';
+      return;
+    }
+
     playlists.forEach(p => {
       const ownerName = p.users?.username || 'Unknown User';
-      const li = document.createElement('li');
-      li.textContent = `${ownerName} - ${p.playlist_name}${p.is_public ? '' : ' (private)'}`;
+      const li        = document.createElement('li');
+      li.className    = 'clickable-item';
+      li.textContent  = `${ownerName} — ${p.playlist_name}${!p.is_public ? ' (private)' : ''}`;
+      li.addEventListener('click', () => showPlaylistModal(p));
+      list.appendChild(li);
+    });
+  }
+
+  // ── Init ───────────────────────────────────────────────────────
+Name} - ${p.playlist_name}${p.is_public ? '' : ' (private)'}`;
       list.appendChild(li);
     });
   }

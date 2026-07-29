@@ -1,8 +1,9 @@
 // albums.js
 // -----------------------------------------------------------------
-// Handles: an artist creating an album, and listing their own
-// albums (needed to populate the "attach to album" dropdown when
-// publishing a song).
+// Handles: an artist creating an album, listing their own albums
+// (needed for the "attach to album" dropdown when publishing a song),
+// editing an existing album, and fetching an album's songs for the
+// dashboard detail popup.
 // -----------------------------------------------------------------
 
 import { db } from './supabaseClient.js';
@@ -78,6 +79,59 @@ export async function attachSongToAlbum(songId, albumId) {
     return false;
   }
   return true;
+}
+
+// Updates an album's title.
+// RLS policy "albums_update_own" ensures only the owning artist can do this.
+export async function updateAlbum(albumId, albumTitle) {
+  const { error } = await db
+    .from('albums')
+    .update({ album_title: albumTitle })
+    .eq('albumid', albumId);
+
+  if (error) {
+    alert('Could not update album: ' + error.message);
+    return false;
+  }
+  return true;
+}
+
+// Deletes an album owned by the current artist.
+// First detaches all songs from this album (sets their albumid to null so
+// they become singles rather than being deleted). Then removes the album row.
+// RLS policy "albums_delete_own" must exist on the albums table.
+export async function deleteAlbum(albumId) {
+  // Detach songs: set albumid = null so songs survive as singles
+  await db
+    .from('songs')
+    .update({ albumid: null })
+    .eq('albumid', albumId);
+
+  const { error } = await db
+    .from('albums')
+    .delete()
+    .eq('albumid', albumId);
+
+  if (error) {
+    alert('Could not delete album: ' + error.message);
+    return false;
+  }
+  return true;
+}
+
+// Returns all songs belonging to a specific album.
+// Used for the dashboard album detail popup.
+export async function getAlbumSongs(albumId) {
+  const { data, error } = await db
+    .from('songs')
+    .select('songid, song_title, duration, song_genres(genre_name)')
+    .eq('albumid', albumId);
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data;
 }
 
 // Returns 10 randomly selected albums, each including the artist's
