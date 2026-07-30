@@ -1,4 +1,5 @@
 // supabaseClient.js
+//supabaseClient.js
 // -----------------------------------------------------------------
 // Single shared connection to our Supabase project.
 // Every other JS file (auth.js, songs.js, playlists.js) imports
