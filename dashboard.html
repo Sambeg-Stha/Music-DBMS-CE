@@ -6,45 +6,6 @@
 <title>Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
-<style>
-  /* ── Modal overlay ─────────────────────────────────────────── */
-  #modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 1000;
-  }
-  #modal-box {
-    background: #fff;
-    max-width: 480px;
-    margin: 80px auto;
-    padding: 28px 24px;
-    border-radius: 10px;
-    max-height: 70vh;
-    overflow-y: auto;
-    position: relative;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  }
-  #modal-close {
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    background: none;
-    border: none;
-    font-size: 20px;
-    cursor: pointer;
-    line-height: 1;
-  }
-  /* ── Clickable list items ───────────────────────────────────── */
-  .clickable-item {
-    cursor: pointer;
-    padding: 4px 0;
-  }
-  .clickable-item:hover {
-    text-decoration: underline;
-  }
-</style>
 </head>
 <body>
 
